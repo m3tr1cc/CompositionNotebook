@@ -19,6 +19,10 @@ type PenColor = '#111111' | '#d42027' | '#1d54d8'
 
 const PEN_COLORS: PenColor[] = ['#111111', '#d42027', '#1d54d8']
 const FRAME_ASPECT = 360 / 231
+const TEXTURE_WIDTH = 240
+const TEXTURE_MIN_HEIGHT = 120
+const TEXTURE_BLACK = [5, 5, 5] as const
+const TEXTURE_WHITE = [247, 246, 239] as const
 
 function seededRandom(seed: number) {
   let value = seed
@@ -31,6 +35,82 @@ function seededRandom(seed: number) {
 
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+function smoothstep(value: number) {
+  return value * value * (3 - 2 * value)
+}
+
+function lerp(start: number, end: number, amount: number) {
+  return start + (end - start) * amount
+}
+
+function hashNoise(x: number, y: number, seed: number) {
+  let value = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041)
+  value = Math.imul(value ^ (value >>> 13), 1274126177)
+
+  return ((value ^ (value >>> 16)) >>> 0) / 4294967295
+}
+
+function valueNoise(x: number, y: number, seed: number) {
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+  const tx = smoothstep(x - x0)
+  const ty = smoothstep(y - y0)
+  const a = hashNoise(x0, y0, seed)
+  const b = hashNoise(x0 + 1, y0, seed)
+  const c = hashNoise(x0, y0 + 1, seed)
+  const d = hashNoise(x0 + 1, y0 + 1, seed)
+
+  return lerp(lerp(a, b, tx), lerp(c, d, tx), ty)
+}
+
+function textureField(x: number, y: number, phase: number) {
+  const slowPhase = phase * 0.55
+  const driftX =
+    Math.sin(y * 0.08 + slowPhase * 1.1) * 5 +
+    Math.sin((x + y) * 0.04 - slowPhase * 0.85) * 4
+  const driftY =
+    Math.cos(x * 0.075 - slowPhase * 0.95) * 5 +
+    Math.sin((x - y) * 0.045 + slowPhase * 0.7) * 4
+
+  const warpedX = x + driftX
+  const warpedY = y + driftY
+  const broad = valueNoise(warpedX * 0.095, warpedY * 0.095, 14)
+  const medium = valueNoise(warpedX * 0.23 + slowPhase * 0.28, warpedY * 0.23, 31)
+  const fleck = valueNoise(x * 0.62, y * 0.62, 58)
+  const ripple =
+    Math.sin(warpedX * 0.2 + warpedY * 0.08 + slowPhase * 1.15) * 0.055 +
+    Math.cos(warpedY * 0.18 - slowPhase * 0.95) * 0.045
+
+  return broad * 0.38 + medium * 0.38 + fleck * 0.24 + ripple
+}
+
+function drawMottledTexture(
+  pattern: CanvasRenderingContext2D,
+  textureWidth: number,
+  textureHeight: number,
+  phase: number,
+) {
+  const image = pattern.createImageData(textureWidth, textureHeight)
+  const pixels = image.data
+
+  for (let y = 0; y < textureHeight; y += 1) {
+    for (let x = 0; x < textureWidth; x += 1) {
+      const value = textureField(x, y, phase)
+      const edge = valueNoise(x * 0.95, y * 0.95, 91) * 0.06
+      const isPaper = value + edge > 0.55
+      const shade = isPaper ? TEXTURE_WHITE : TEXTURE_BLACK
+      const index = (y * textureWidth + x) * 4
+
+      pixels[index] = shade[0]
+      pixels[index + 1] = shade[1]
+      pixels[index + 2] = shade[2]
+      pixels[index + 3] = 255
+    }
+  }
+
+  pattern.putImageData(image, 0, 0)
 }
 
 function labelPath(ctx: CanvasRenderingContext2D, bounds: Bounds) {
@@ -104,9 +184,9 @@ function prepareCanvas(canvas: HTMLCanvasElement, width: number, height: number)
   return ctx
 }
 
-function drawCover(ctx: CanvasRenderingContext2D, width: number, height: number, seed: number) {
-  const textureWidth = 180
-  const textureHeight = Math.max(90, Math.round(textureWidth / (width / height)))
+function drawCover(ctx: CanvasRenderingContext2D, width: number, height: number, phase: number) {
+  const textureWidth = TEXTURE_WIDTH
+  const textureHeight = Math.max(TEXTURE_MIN_HEIGHT, Math.round(textureWidth / (width / height)))
   const texture = document.createElement('canvas')
   texture.width = textureWidth
   texture.height = textureHeight
@@ -116,23 +196,12 @@ function drawCover(ctx: CanvasRenderingContext2D, width: number, height: number,
     return
   }
 
-  const random = seededRandom(seed)
-  pattern.fillStyle = '#050505'
-  pattern.fillRect(0, 0, textureWidth, textureHeight)
-
-  for (let i = 0; i < 760; i += 1) {
-    const x = random() * textureWidth
-    const y = random() * textureHeight
-    const radius = 0.8 + random() * 2.8
-    pattern.fillStyle = random() > 0.16 ? '#f7f6ef' : '#050505'
-    pattern.beginPath()
-    pattern.arc(x, y, radius, 0, Math.PI * 2)
-    pattern.fill()
-  }
+  drawMottledTexture(pattern, textureWidth, textureHeight, phase)
 
   pattern.strokeStyle = '#f7f6ef'
   pattern.lineWidth = 1.4
   pattern.lineCap = 'round'
+  const random = seededRandom(42)
 
   for (let i = 0; i < 220; i += 1) {
     const x = random() * textureWidth
@@ -146,6 +215,7 @@ function drawCover(ctx: CanvasRenderingContext2D, width: number, height: number,
   }
 
   ctx.clearRect(0, 0, width, height)
+  ctx.imageSmoothingEnabled = false
   ctx.drawImage(texture, 0, 0, width, height)
 
   const label = getLabelBounds(width, height)
@@ -235,7 +305,7 @@ function App() {
     }
 
     boundsRef.current = getLabelBounds(rect.width, rect.height)
-    drawCover(coverCtx, rect.width, rect.height, Math.floor(performance.now()))
+    drawCover(coverCtx, rect.width, rect.height, 0)
   }, [])
 
   useEffect(() => {
@@ -254,22 +324,22 @@ function App() {
 
   useEffect(() => {
     let animationFrame = 0
-    let lastJitter = 0
+    let lastDraw = 0
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const interval = reduceMotion ? 900 : 135
+    const frameInterval = reduceMotion ? 2400 : 72
 
     const animate = (time: number) => {
       const cover = coverCanvasRef.current
       const frame = frameRef.current
 
-      if (cover && frame && time - lastJitter >= interval) {
+      if (cover && frame && time - lastDraw >= frameInterval) {
         const rect = frame.getBoundingClientRect()
         const ctx = cover.getContext('2d')
 
         if (ctx) {
           ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0)
-          drawCover(ctx, rect.width, rect.height, Math.floor(time / interval))
-          lastJitter = time
+          drawCover(ctx, rect.width, rect.height, reduceMotion ? 0 : time / 950)
+          lastDraw = time
         }
       }
 
