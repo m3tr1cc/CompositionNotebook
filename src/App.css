@@ -1,0 +1,204 @@
+.notebook-frame {
+  position: relative;
+  width: 100vw;
+  height: 100svh;
+  min-height: 320px;
+  overflow: hidden;
+  background: #050505;
+  color: #111111;
+  touch-action: none;
+  user-select: none;
+}
+
+.cover-canvas,
+.drawing-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cover-canvas {
+  z-index: 0;
+}
+
+.drawing-canvas {
+  z-index: 1;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.pen-controls,
+.action-controls {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pen-controls {
+  top: clamp(10px, 3vw, 18px);
+  left: clamp(10px, 3vw, 18px);
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(250, 248, 238, 0.72);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(2px);
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.color-button {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 2px solid #f8f4e8;
+  border-radius: 999px;
+  background: var(--swatch);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.color-button:hover,
+.color-button:focus-visible,
+.color-button.is-selected {
+  transform: scale(1.22);
+}
+
+.color-button:focus-visible {
+  outline: 2px solid #f8f4e8;
+  outline-offset: 3px;
+}
+
+.color-button.is-selected {
+  box-shadow:
+    0 0 0 3px #f8f4e8,
+    0 0 0 5px rgba(0, 0, 0, 0.88);
+}
+
+.pen-slider {
+  width: clamp(78px, 17vw, 132px);
+  accent-color: #111111;
+  cursor: pointer;
+}
+
+.action-controls {
+  top: clamp(10px, 3vw, 18px);
+  right: clamp(10px, 3vw, 18px);
+}
+
+.tool-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #111111;
+  border-radius: 999px;
+  background: rgba(250, 248, 238, 0.86);
+  color: #111111;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.86);
+  cursor: pointer;
+  transition:
+    transform 170ms ease,
+    box-shadow 170ms ease,
+    background-color 170ms ease;
+}
+
+.tool-button:hover,
+.tool-button:focus-visible {
+  transform: scale(1.15);
+  background: #fffdf5;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.86);
+}
+
+.tool-button:active {
+  transform: scale(1.08);
+}
+
+.tool-button:focus-visible {
+  outline: 3px solid #fffdf5;
+  outline-offset: 3px;
+}
+
+.tool-button::after {
+  position: absolute;
+  inset: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  content: '';
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+}
+
+.tool-button.is-rippling::after {
+  animation: ripple 360ms ease-out;
+}
+
+.tool-button.is-spinning svg {
+  animation: spin 520ms cubic-bezier(0.26, 0.78, 0.3, 1);
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(7);
+  }
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 520px) {
+  .pen-controls {
+    gap: 8px;
+    padding: 7px 9px;
+  }
+
+  .color-button {
+    width: 16px;
+    height: 16px;
+    flex-basis: 16px;
+  }
+
+  .tool-button {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .color-button,
+  .tool-button {
+    transition-duration: 1ms;
+  }
+
+  .tool-button.is-rippling::after,
+  .tool-button.is-spinning svg {
+    animation-duration: 1ms;
+  }
+}
